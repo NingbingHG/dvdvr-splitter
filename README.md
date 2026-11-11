@@ -153,3 +153,15 @@ contrib\发布步骤.md         手动步骤 / 补丁用法
 patch\0001-*.patch         git format-patch 补丁（已验证 git am 可用）
 dvdvr-splitter-v2.bundle   git bundle
 ```
+
+## 九、界面截图（中 / 日 / 英）
+
+完整截图在仓库 `screenshots/v2.1.4/` 下，每个功能三语各一张。
+
+| 功能 | 中文 | 日本語 | English |
+|---|---|---|---|
+| 主界面 / 节目列表 | <img src="screenshots/v2.1.4/zh/01-main.png" width="340"> | <img src="screenshots/v2.1.4/ja/01-main.png" width="340"> | <img src="screenshots/v2.1.4/en/01-main.png" width="340"> |
+| 关于（仓库 + 头像） | <img src="screenshots/v2.1.4/zh/02-about.png" width="340"> | <img src="screenshots/v2.1.4/ja/02-about.png" width="340"> | <img src="screenshots/v2.1.4/en/02-about.png" width="340"> |
+| 输入/输出同盘提醒 | <img src="screenshots/v2.1.4/zh/03-same-drive.png" width="340"> | <img src="screenshots/v2.1.4/ja/03-same-drive.png" width="340"> | <img src="screenshots/v2.1.4/en/03-same-drive.png" width="340"> |
+| 导出完成 | <img src="screenshots/v2.1.4/zh/04-export-done.png" width="340"> | <img src="screenshots/v2.1.4/ja/04-export-done.png" width="340"> | <img src="screenshots/v2.1.4/en/04-export-done.png" width="340"> |
+| 输出目录不可写 | <img src="screenshots/v2.1.4/zh/05-output-unwritable.png" width="340"> | <img src="screenshots/v2.1.4/ja/05-output-unwritable.png" width="340"> | <img src="screenshots/v2.1.4/en/05-output-unwritable.png" width="340"> |
