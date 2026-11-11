@@ -3,7 +3,7 @@
 按 DVD-VR 光盘 **IFO 里的节目表**，把 `VR_MOVIE.VRO` 无损拆成一个个 `.mpg`。
 是 [spinningbanana/dvd-rtr-vmg0-splitter](https://github.com/spinningbanana/dvd-rtr-vmg0-splitter) 的重写版。
 
-- 版本：**2.1.3**
+- 版本：**2.1.4**
 - 语言：**中文 / 日本語 / English**（界面右上角切换，选择会记住）
 - 许可：GPL-3.0（沿用原项目）
 - 依赖：Python 3.9+；GUI 需 PySide6；`--remux` 需 ffmpeg
@@ -115,6 +115,12 @@ python dvdvr_split.py --ifo ... --vro ... -o D:\out --programs 2 --remux --lang 
   仍失败时报出**具体偏移**和**已写入字节数**。
 - 新增 **「读取错误时跳过」** 选项（命令行 `--skip-errors`）：光盘有划痕时可跳过坏块继续导出，
   跳过的位置会写进日志。
+
+### 2.1.4 改进（2026-11-12）
+
+- 新增 **「关于」** 按钮（右上角，命令行 `--about`）：弹窗里显示
+  **上游项目**（spinningbanana / dvd-rtr-vmg0-splitter）与**本版本仓库**（NingbingHG / dvdvr-splitter），
+  各配 GitHub 头像（圆形裁剪）和可点击链接，底部标注 GPL-3.0 与实测设备 DZ-GX20。
 
 ### 2.1.3 改进（2026-11-12）
 

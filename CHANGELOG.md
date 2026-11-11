@@ -3,6 +3,14 @@
 All notable changes to this project.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.4] — 2026-11-12
+
+### Added
+- **About dialog** (toolbar button / `--about`): shows the upstream project
+  (spinningbanana / dvd-rtr-vmg0-splitter) and this fork (NingbingHG /
+  dvdvr-splitter) with their GitHub avatars (circular crop) and clickable
+  links, plus the GPL-3.0 note and the DZ-GX20 test device.
+
 ## [2.1.3] — 2026-11-12
 
 ### Changed
