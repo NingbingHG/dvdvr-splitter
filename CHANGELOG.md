@@ -1,7 +1,19 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+
+## [2.1.3] — 2026-11-12
+
+### Changed
+- Default output folder is now the Windows **Videos** known folder
+  (`SHGetKnownFolderPath(FOLDERID_Videos)`; honours OneDrive redirection)
+  instead of the disc folder / `Videos\DVD_OUT`.
+
+### Added
+- Warning when the output folder is on the **same drive as the input** (usually
+  the optical drive, which is read-only): a Yes/No dialog before exporting, and
+  an immediate heads-up when picking such a folder with `Browse…`.
 
 ## [2.1.2] — 2026-11-12
 
