@@ -1,3 +1,5 @@
+> **Note:** This project is a heavily modified fork/derivative of [spinningbanana's original project](链接). The core logic for handling binary data was inspired by the upstream project. 
+
 ﻿# DVD-VR Splitter 2
 
 按 DVD-VR 光盘 **IFO 里的节目表**，把 `VR_MOVIE.VRO` 无损拆成一个个 `.mpg`。
