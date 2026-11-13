@@ -173,3 +173,79 @@ dvdvr-splitter-v2.bundle   git bundle
 | 输入/输出同盘提醒 | <img src="screenshots/v2.1.4/zh/03-same-drive.png" width="340"> | <img src="screenshots/v2.1.4/ja/03-same-drive.png" width="340"> | <img src="screenshots/v2.1.4/en/03-same-drive.png" width="340"> |
 | 导出完成 | <img src="screenshots/v2.1.4/zh/04-export-done.png" width="340"> | <img src="screenshots/v2.1.4/ja/04-export-done.png" width="340"> | <img src="screenshots/v2.1.4/en/04-export-done.png" width="340"> |
 | 输出目录不可写 | <img src="screenshots/v2.1.4/zh/05-output-unwritable.png" width="340"> | <img src="screenshots/v2.1.4/ja/05-output-unwritable.png" width="340"> | <img src="screenshots/v2.1.4/en/05-output-unwritable.png" width="340"> |
+
+---
+
+## 附录：v2.1.5 如何判断 IFO 与 VRO 是否匹配
+
+v2.1.5 的容错**完全建立在 IFO（`VR_MANGR.IFO`）的解析结果上**，不猜、不扫关键帧，只按 IFO 记录的地址去算字节区间。
+
+### 1. IFO 里存了什么
+
+```
+0x100  pgit_sa ─────────────► PGI 表（节目表）
+                              ├─ +0..3   : nr_of_pgi / nr_of_vob_formats
+                              ├─ +8      : vob_format_t × N（每个 60 字节）
+                              ├─ 之后 2B : nr_of_programs   ← 节目数
+                              └─ 之后 4B×N: vvobi_sa[]      ← 每个节目的相对偏移
+                                                 │
+每个节目 = 1 条 VVOB 记录 ◄──────────────────────┘
+   vob_attr(2) | 录制时间(5) | format_id(1) | s_ptm(4) | e_ptm(4)
+   + n_time(2) | n_vobu(2) | vob_off(4) | VOBU 大小表（每项 2B，低 14 位）
+```
+
+一个节目的字节区间：
+
+```
+起点 = vob_off × 2048
+长度 = Σ (vobu_size & 0x3FF) × 2048
+终点 = 起点 + 长度
+```
+
+### 2. 为什么会出现“同一个偏移 0 的多组节目”
+
+DVD-RAM 可重写：相机里「删除节目」只是**打删除标记**，IFO 的节目条目仍然保留；空间被后续录制重新分配，**新录制从偏移 0 开始写**。于是 IFO 里同时存在旧条目和新条目，而 VRO 里只剩最后一次录制的数据。
+
+### 3. 判断算法（4 步）
+
+```
+① 解析 IFO → 得到每个节目的 [起点, 终点)
+② 分组：下一个节目的起点 == 上一个节目的终点 → 同一组；
+        不连续（尤其是回到 0）→ 开新组
+③ 取最后一组，与 VRO 的真实文件大小比对：
+     终点 == VRO 大小   → 这一组就是当前内容
+     终点 >  VRO 大小   → 文件可能没拷全（导出时截断）
+     起点 ≥  VRO 大小   → 这一组没有数据
+④ 分类：
+     usable  ：整段落在文件内   → 勾选导出
+     partial ：跨过文件末尾     → 勾选，导出时截断
+     missing ：不在这组/超出    → 取消勾选 + 告警说明
+```
+
+`--list` 会打印结论，GUI 会弹窗说明并自动改勾选。
+
+### 4. 实测数据（日立 DZ-GX20，双面 DVD-RAM）
+
+| 拷贝 | 节目数 | 分组（每组都从 0 开始） | VRO 实际大小 |
+|---|---|---|---|
+| A 面 | 29 | 组1 #1–#24（0 → 818,153,472）<br>组2 #25–#29（0 → 172,247,040） | 172,247,040 |
+| B 面 | 9 | 组1 #1（0 → 48.7 MB）<br>组2 #2–#7（0 → 126 MB）<br>组3 #8–#9（0 → 95,201,280） | 95,201,280 |
+
+### 5. 为什么信“最后一组”
+
+三个独立证据互相印证：
+
+| 证据 | A 面 | B 面 |
+|---|---|---|
+| 最后一组的字节终点 == VRO 大小 | 172,247,040 == 172,247,040 ✅ | 95,201,280 == 95,201,280 ✅ |
+| 最后一组时长 == ffmpeg 实际解码时长 | 228.2 s == 228.16 s ✅ | 126.1 s == 126.05 s ✅ |
+| 按旧组导出 | `ac-tex damaged`、`Invalid frame dimensions`（花屏） | 同左 |
+| 按最后一组导出 | 2475 帧 / 82.58 s、1305 帧 / 43.54 s，零错误 ✅ | 同左 |
+
+### 6. 行为与边界
+
+- 默认**只导可用节目**，旧条目自动取消勾选并说明原因；
+- 最后一组超出文件末尾时提示“拷贝可能不完整”，导出**在末尾截断**；
+- `--force` 可强行导出 IFO 里全部条目（会花屏，仅用于诊断）；
+- v2.1.5 是**纯读取**方案：不改盘上任何文件，也不重写 IFO 里的 VOB 表（M_AVFIT）。
+  若相机仍显示旧节目或要求修复，请在相机上执行一次 **Update Control Info.**（或 Format Disc）。
