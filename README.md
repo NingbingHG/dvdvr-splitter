@@ -1,11 +1,9 @@
-> **Note:** This project is a heavily modified fork/derivative of [spinningbanana's original project](链接). The core logic for handling binary data was inspired by the upstream project. 
-
 ﻿# DVD-VR Splitter 2
 
 按 DVD-VR 光盘 **IFO 里的节目表**，把 `VR_MOVIE.VRO` 无损拆成一个个 `.mpg`。
 是 [spinningbanana/dvd-rtr-vmg0-splitter](https://github.com/spinningbanana/dvd-rtr-vmg0-splitter) 的重写版。
 
-- 版本：**2.1.4**
+- 版本：**2.1.5**
 - 语言：**中文 / 日本語 / English**（界面右上角切换，选择会记住）
 - 许可：GPL-3.0（沿用原项目）
 - 依赖：Python 3.9+；GUI 需 PySide6；`--remux` 需 ffmpeg
@@ -118,6 +116,14 @@ python dvdvr_split.py --ifo ... --vro ... -o D:\out --programs 2 --remux --lang 
 - 新增 **「读取错误时跳过」** 选项（命令行 `--skip-errors`）：光盘有划痕时可跳过坏块继续导出，
   跳过的位置会写进日志。
 
+### 2.1.5 修复（2026-11-14）
+
+- **不再对“IFO 与 VRO 长度对不上”一刀切报错**。DVD-RAM 反复用同一张盘录制后，IFO 里会残留以前录制的节目条目
+  （删除只是打标记，空间被后来的录制重用，新录制从偏移 0 开始），VRO 里只剩最后一组的实际数据。
+- 程序现在会按“字节区间是否连续”把节目**分组**，自动选出能与当前 VRO 对上的那一组，
+  其余条目标记为“数据不在 VRO 里”并取消勾选；同时弹窗说明原因。
+- 若最后一组也超出 VRO 末尾，会提示“拷贝可能不完整”，导出时在末尾截断。
+- 命令行默认只导可用节目，`--force` 可强制导出全部（会出现花屏/错位）。
 ### 2.1.4 改进（2026-11-12）
 
 - 新增 **「关于」** 按钮（右上角，命令行 `--about`）：弹窗里显示

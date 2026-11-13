@@ -58,7 +58,7 @@ from typing import Callable, List, Optional
 
 SECTOR = 2048
 APP_NAME = "DVD-VR Splitter"
-APP_VERSION = "2.1.4"
+APP_VERSION = "2.1.5"
 
 # Windows 控制台默认 GBK；被重定向（管道/文件）时改用 UTF-8，避免乱码
 if sys.platform == "win32":
@@ -210,6 +210,12 @@ STR = {
         "about.upstream": "上游项目（原版）",
         "about.mine": "本版本（修复 + 新增功能）",
         "about.footer": "许可 GPL-3.0　·　实测设备：日立 Hitachi DZ-GX20（DVD-RAM / VR 模式）",
+        "warn.multi_group": "IFO 里包含 {groups} 组节目（共 {total} 个），只有最后一组（#{first}–#{last}，共 {chosen} 个）能在当前 VRO 里找到。\n\n其余条目是以前录制留下的，数据已经被覆盖（DVD-RAM 删除只是标记，空间被后来的录制重用，新录制从偏移 0 开始），已自动取消勾选。",
+        "warn.group_cut": "最后一组节目也超出了 VRO 末尾：需要 {need} 字节，实际只有 {have} 字节。\n文件可能拷贝不完整，导出时会在末尾截断。",
+        "err.no_usable": "VRO 比 IFO 描述短：需要 {need} 字节，实际 {have} 字节，且找不到任何可导出的节目。\n可能 IFO 与 VRO 不是同一张盘，或 VRO 拷贝不完整。",
+        "info.layout": "\n当前 VRO 里只有 #{first}–#{last} 共 {n} 个节目（IFO 共列了 {total} 个）",
+        "msg.partial_export": "有 {n} 个节目超出 VRO 末尾（文件可能没拷全），导出会在末尾截断。\n\n仍然继续吗？",
+        "log.skip_out": "跳过 #{i}：数据不在当前 VRO 里",
         "msg.same_drive": "检测到输出目录和输入文件在同一个盘（{drive}）。\n光驱 / 光盘通常是只读的，写入会失败。\n\n确定仍要继续吗？（建议改选本地硬盘上的目录，例如“视频”文件夹）",
         "msg.same_drive_pick": "这个目录在 {drive} 上，和输入文件是同一个盘（通常是光驱，不可写）。\n请换成本地硬盘上的目录。",
         "err.read_failed": "读取 VRO 失败：偏移 {off} 字节（已写入 {got}/{want} 字节）\n{e}\n\n常见原因：\n  • 摄像机/录像机断电或电池耗尽（USB 连接会立刻中断）\n  • USB 数据线松动、接触不良或被拔出\n  • 光盘有划痕/脏污，或虚拟光驱掉线、镜像文件不完整\n\n建议：给设备接上电源适配器、重新插好数据线后重试；或先把 VR_MOVIE.VRO 复制到本地硬盘再处理；确实读不出的坏块可勾选「读取错误时跳过」。",
@@ -304,6 +310,12 @@ STR = {
         "about.upstream": "上流プロジェクト（オリジナル版）",
         "about.mine": "このバージョン（修正＋機能追加）",
         "about.footer": "ライセンス GPL-3.0　·　動作確認：日立 Hitachi DZ-GX20（DVD-RAM / VR モード）",
+        "warn.multi_group": "IFO には {groups} 組・計 {total} 番組が入っていますが、末尾の組（#{first}〜#{last}、{chosen} 番組）だけが現在の VRO と一致します。\n\n残りは過去の録画の残骸で、データは上書きされています（DVD-RAM の削除はマークだけで、領域は後の録画に再利用され、新しい録画はオフセット 0 から始まります）。チェックを外しました。",
+        "warn.group_cut": "末尾の組も VRO の終端を超えています: 必要 {need} バイト、実際 {have} バイト。\nコピーが不完全な可能性があり、書き出しは末尾で切られます。",
+        "err.no_usable": "VRO が IFO の記述より短いです: 必要 {need} バイト、実際 {have} バイト。書き出せる番組がありません。\nIFO と VRO が別のディスクか、VRO のコピーが不完全です。",
+        "info.layout": "\n現在の VRO にあるのは #{first}〜#{last} の {n} 番組だけです（IFO には {total} 番組）",
+        "msg.partial_export": "{n} 番組が VRO の終端を超えています（コピー不完全の可能性）。書き出しは末尾で切られます。\n\n続行しますか？",
+        "log.skip_out": "#{i} をスキップ：データが現在の VRO にありません",
         "msg.same_drive": "出力先と入力ファイルが同じドライブ（{drive}）です。\n光学ドライブ / ディスクは通常読み取り専用のため、書き込みに失敗します。\n\nこのまま続行しますか？（ローカルディスク上のフォルダーを推奨）",
         "msg.same_drive_pick": "このフォルダーは {drive} 上にあり、入力ファイルと同じドライブです（通常は光学ドライブで書き込み不可）。\nローカルディスク上のフォルダーを選んでください。",
         "err.read_failed": "VRO の読み込みに失敗しました: オフセット {off} バイト（{got}/{want} バイト書き込み済み）\n{e}\n\nよくある原因:\n  • カメラ／レコーダーの電源が切れた、バッテリー切れ（USB 接続が瞬断します）\n  • USB ケーブルの接触不良・抜け\n  • ディスクの傷・汚れ、仮想ドライブの切断、イメージの破損\n\n対処: AC アダプターで給電し、ケーブルを接続し直してから再試行してください。VR_MOVIE.VRO をローカルディスクにコピーしてから処理するのも有効です。読めないブロックは「読み取りエラーをスキップ」で続行できます。",
@@ -398,6 +410,12 @@ STR = {
         "about.upstream": "Upstream project (original)",
         "about.mine": "This version (fixes + features)",
         "about.footer": "License GPL-3.0    ·    Tested with Hitachi DZ-GX20 (DVD-RAM, VR mode)",
+        "warn.multi_group": "The IFO lists {groups} groups of programs ({total} in total), but only the last group (#{first}–#{last}, {chosen} programs) matches the current VRO.\n\nThe others are leftovers from earlier recordings whose data has been overwritten (deleting on DVD-RAM only marks them; the space is reused and new recordings start at offset 0). They have been unchecked.",
+        "warn.group_cut": "The last group also exceeds the end of the VRO: needs {need} bytes, file has {have}.\nThe copy may be incomplete; exports will be truncated at the end.",
+        "err.no_usable": "The VRO is shorter than the IFO describes: needs {need} bytes, file has {have}, and no program can be exported.\nThe IFO and VRO may come from different discs, or the VRO copy is incomplete.",
+        "info.layout": "\nOnly programs #{first}–#{last} ({n}) exist in this VRO (the IFO lists {total})",
+        "msg.partial_export": "{n} program(s) extend past the end of the VRO (the copy may be incomplete); their files will be truncated.\n\nContinue anyway?",
+        "log.skip_out": "skipped #{i}: data is not in the current VRO",
         "msg.same_drive": "The output folder is on the same drive as the input file ({drive}).\nOptical drives/discs are usually read-only, so writing will fail.\n\nContinue anyway? (A folder on a local disk is recommended.)",
         "msg.same_drive_pick": "That folder is on {drive}, the same drive as the input file (usually an optical drive, not writable).\nPlease choose a folder on a local disk.",
         "err.read_failed": "Failed to read VRO at offset {off} bytes (wrote {got}/{want})\n{e}\n\nTypical causes:\n  • the camcorder/recorder lost power or its battery ran out (the USB link drops instantly)\n  • loose, unplugged or faulty USB cable\n  • scratched/dirty disc, virtual drive disconnected, incomplete image file\n\nSuggestion: power the device from AC, reconnect the cable and retry; or copy VR_MOVIE.VRO to a local disk first. Blocks that still fail can be skipped with \"skip read errors\".",
@@ -542,6 +560,10 @@ class Program:
     def start_byte(self) -> int:
         return self.vob_offset_sectors * SECTOR
 
+    @property
+    def end_byte(self) -> int:
+        return self.start_byte + self.byte_size
+
     def time_label(self) -> str:
         if self.rec_time:
             return "%04d-%02d-%02d %02d:%02d:%02d" % self.rec_time
@@ -565,6 +587,8 @@ class DiscInfo:
     nr_formats: int
     cprm: bool
     programs: List[Program] = field(default_factory=list)
+    vsize: int = 0
+    layout: Optional["Layout"] = None
 
     @property
     def total_bytes(self) -> int:
@@ -576,6 +600,74 @@ class DiscInfo:
 
 
 # --------------------------------------------------------------------------- 解析
+@dataclass
+class Layout:
+    """IFO 节目表与 VRO 实际大小的匹配情况"""
+    groups: List[tuple]          # [(first_idx, last_idx)]，0 基下标
+    selected: int                # 采用的分组
+    usable: List[int]            # 完整落在 VRO 内的节目号（1 基）
+    partial: List[int]           # 跨过 VRO 末尾、只能截断导出的节目号
+    missing: List[int]           # 数据不在 VRO 里的节目号
+    warnings: List[str] = field(default_factory=list)
+
+    @property
+    def first(self) -> int:
+        return self.groups[self.selected][0] + 1
+
+    @property
+    def last(self) -> int:
+        return self.groups[self.selected][1] + 1
+
+
+def analyze_layout(info: "DiscInfo", vsize: int) -> Optional[Layout]:
+    """把节目按“字节区间连续”分成若干组。
+
+    DVD-VR 盘被反复录制/删除后，IFO 里可能残留多组节目（每组都从偏移 0 开始），
+    而 VRO 只包含最后一组的实际数据。这里选出最后一组，并区分可用/截断/缺失。
+    """
+    progs = info.programs
+    if not progs:
+        return None
+    groups = []
+    start = 0
+    prev_end = None
+    for i, p in enumerate(progs):
+        if prev_end is not None and p.start_byte != prev_end:
+            groups.append((start, i - 1))
+            start = i
+        prev_end = p.end_byte
+    groups.append((start, len(progs) - 1))
+
+    sel = len(groups) - 1
+    first, last = groups[sel]
+    g_start = progs[first].start_byte
+    g_end = progs[last].end_byte
+    if g_start >= vsize:
+        return None
+
+    usable, partial, missing = [], [], []
+    for p in progs[first:last + 1]:
+        if p.end_byte <= vsize:
+            usable.append(p.index)
+        elif p.start_byte < vsize:
+            partial.append(p.index)
+        else:
+            missing.append(p.index)
+    # 前面的组一律视为“不在本 VRO”
+    for (a, b) in groups[:sel]:
+        for p in progs[a:b + 1]:
+            missing.append(p.index)
+
+    warnings = []
+    if len(groups) > 1:
+        warnings.append(t("warn.multi_group", groups=len(groups), total=len(progs),
+                          first=first + 1, last=last + 1, chosen=last - first + 1))
+    if g_end > vsize:
+        warnings.append(t("warn.group_cut", need=g_end, have=vsize))
+    return Layout(groups=groups, selected=sel, usable=sorted(usable),
+                  partial=sorted(partial), missing=sorted(missing), warnings=warnings)
+
+
 def parse_ifo(path: str) -> DiscInfo:
     try:
         with open(path, "rb") as f:
@@ -660,12 +752,11 @@ def open_disc(ifo_path: str, vro_path: str) -> DiscInfo:
         raise DVDVRError(t("err.open_vro", e=e))
     if vsize < 2048:
         raise DVDVRError(t("err.vro_small", n=vsize))
-    over = [p for p in info.programs if p.start_byte + p.byte_size > vsize]
-    if over:
-        raise DVDVRError(t("err.vro_short",
-                           which=", ".join("#%d" % p.index for p in over),
-                           need=max(p.start_byte + p.byte_size for p in over),
-                           have=vsize))
+    info.vsize = vsize
+    info.layout = analyze_layout(info, vsize)
+    if info.layout is None or (not info.layout.usable and not info.layout.partial):
+        need = max((p.end_byte for p in info.programs), default=0)
+        raise DVDVRError(t("err.no_usable", need=need, have=vsize))
     return info
 
 
@@ -698,9 +789,13 @@ def extract_program(vro_path: str, prog: Program, out_path: str,
                     progress: Optional[Callable[[int, int], None]] = None,
                     cancel: Optional[Callable[[], bool]] = None,
                     skip_errors: bool = False,
-                    on_skip: Optional[Callable[[int, int], None]] = None) -> int:
-    """按字节拷贝一个节目。读盘出错时重试；skip_errors=True 则跳过坏块继续。"""
-    total = prog.byte_size
+                    on_skip: Optional[Callable[[int, int], None]] = None,
+                    max_bytes: Optional[int] = None) -> int:
+    """按字节拷贝一个节目。读盘出错时重试；skip_errors=True 则跳过坏块继续。
+
+    max_bytes 用于 VRO 被截断的情况：只导到文件末尾。
+    """
+    total = prog.byte_size if max_bytes is None else max(0, min(prog.byte_size, max_bytes))
     done = 0
     skipped = 0
     tmp = out_path + ".part"
@@ -712,6 +807,8 @@ def extract_program(vro_path: str, prog: Program, out_path: str,
                 if cancel and cancel():
                     raise Cancelled()
                 remaining = size * SECTOR
+                if done + remaining > total:
+                    remaining = max(0, total - done)
                 while remaining > 0:
                     want = min(READ_CHUNK, remaining)
                     data = _read_block(src, offset, want)
@@ -850,6 +947,12 @@ def cmd_list(args) -> int:
     print(t("cli.summary", n=len(info.programs), fmt=info.nr_formats,
             dur=fmt_ptm(info.total_duration), size=fmt_bytes(info.total_bytes),
             cprm=("   " + t("info.cprm").strip()) if info.cprm else ""))
+    lay = info.layout
+    if lay and lay.warnings:
+        for w in lay.warnings:
+            print()
+            for line in w.split("\n"):
+                print("  ! " + line if line.strip() else "")
     print()
     print("  %-4s %-20s %-14s %12s %14s" % ("#", t("cli.h_time"), t("cli.h_dur"),
                                             t("cli.h_size"), t("cli.h_off")))
@@ -878,6 +981,12 @@ def cmd_extract(args) -> int:
 
     ensure_output_dir(args.out)
     todo = [p for p in info.programs if wanted is None or p.index in wanted]
+    lay = info.layout
+    if lay and not args.force:
+        allowed = set(lay.usable) | set(lay.partial)
+        for x in [q for q in todo if q.index not in allowed]:
+            print(t("log.skip_out", i=x.index))
+        todo = [q for q in todo if q.index in allowed]
     ffmpeg = which_ffmpeg() if args.remux else None
     if args.remux and not ffmpeg:
         raise DVDVRError(t("err.ffmpeg_needed"))
@@ -888,8 +997,13 @@ def cmd_extract(args) -> int:
         final = os.path.join(args.out, name)
         raw = final + ".vob" if args.remux else final
         t0 = time.time()
+        limit = p.byte_size if p.end_byte <= info.vsize else max(0, info.vsize - p.start_byte)
+        if limit <= 0:
+            print(t("log.skip_out", i=p.index))
+            continue
         n = extract_program(args.vro, p, raw, skip_errors=args.skip_errors,
-                            on_skip=lambda off, nb: print(t("log.skip_block", off=off, n=nb)))
+                            on_skip=lambda off, nb: print(t("log.skip_block", off=off, n=nb)),
+                            max_bytes=limit)
         if args.remux:
             remux_with_ffmpeg(raw, final, ffmpeg)
             os.remove(raw)
@@ -910,6 +1024,8 @@ def build_cli() -> argparse.ArgumentParser:
     ap.add_argument("--programs", help="program numbers to export, e.g. 1,3 (default: all)")
     ap.add_argument("--list", action="store_true", help="list programs only")
     ap.add_argument("--remux", action="store_true", help="remux to clean MPG with ffmpeg")
+    ap.add_argument("--force", action="store_true",
+                    help="also export entries whose data is not in the VRO (garbage)")
     ap.add_argument("--skip-errors", action="store_true",
                     help="skip unreadable blocks instead of aborting (scratched discs)")
     ap.add_argument("--ffmpeg", help="path to ffmpeg.exe")
@@ -997,11 +1113,19 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
                     def cb(done, total, _base=base_done):
                         self.progress.emit(_base + done, total_all)
 
+                    limit = p.byte_size if p.end_byte <= self.info.vsize else max(
+                        0, self.info.vsize - p.start_byte)
+                    if limit <= 0:
+                        self.log.emit(t("log.skip_out", i=p.index))
+                        base_done += p.byte_size
+                        self.progress.emit(base_done, total_all)
+                        continue
                     n = extract_program(self.info.vro_path, p, raw,
                                         progress=cb, cancel=lambda: self._cancel,
                                         skip_errors=self.skip_errors,
                                         on_skip=lambda off, nb: self.log.emit(
-                                            t("log.skip_block", off=off, n=nb)))
+                                            t("log.skip_block", off=off, n=nb)),
+                                        max_bytes=limit)
                     if self.remux:
                         self.log.emit(t("log.remuxing"))
                         remux_with_ffmpeg(raw, final, ffmpeg)
@@ -1193,11 +1317,16 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
 
         def _info_text(self) -> str:
             i = self.info
-            return t("info.summary",
+            text = t("info.summary",
                      ifo=os.path.basename(i.ifo_path), vro=os.path.basename(i.vro_path),
                      n=len(i.programs), dur=fmt_ptm(i.total_duration),
                      size=fmt_bytes(i.total_bytes),
                      cprm=("\n" + t("info.cprm").strip()) if i.cprm else "")
+            lay = i.layout
+            if lay and lay.warnings:
+                text += t("info.layout", first=lay.first, last=lay.last,
+                          n=len(lay.usable) + len(lay.partial), total=len(i.programs))
+            return text
 
         # ---- 关于
         def _load_avatar(self, filename: str, letter: str = "?"):
@@ -1347,6 +1476,15 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
             self.info = info
             self.lbl_info.setText(self._info_text())
             self._fill_table()
+            lay = info.layout
+            if lay:
+                inside = set(lay.usable) | set(lay.partial)
+                for r, p in enumerate(info.programs):
+                    it = self.table.item(r, 0)
+                    if it:
+                        it.setCheckState(Qt.Checked if p.index in inside else Qt.Unchecked)
+                if lay.warnings:
+                    QMessageBox.warning(self, APP_NAME, "\n\n".join(lay.warnings))
             if not self.ed_out.text().strip():
                 # 默认输出到 Windows 的“视频”文件夹（而不是光盘目录）
                 out = videos_dir()

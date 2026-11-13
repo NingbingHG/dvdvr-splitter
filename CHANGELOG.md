@@ -3,6 +3,22 @@
 All notable changes to this project.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.5] — 2026-11-14
+
+### Fixed
+- Do not hard-fail when the IFO describes more data than the VRO holds.
+  Rewritable DVD-RAM discs keep program entries from earlier recordings
+  (deleting only marks them; the space is reused and new recordings start at
+  offset 0), so several offset groups can exist while the VRO carries only the
+  last one.
+- Programs are now grouped by contiguous byte ranges; the group matching the
+  current VRO is selected automatically, the rest are reported and unchecked,
+  and a dialog explains why.
+- If even the last group runs past the end of the VRO, the export is truncated
+  at EOF and the copy is flagged as probably incomplete.
+- CLI: only usable programs are exported by default; `--force` exports
+  everything (garbage for the stale entries).
+
 ## [2.1.4] — 2026-11-12
 
 ### Added
