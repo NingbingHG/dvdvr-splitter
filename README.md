@@ -3,7 +3,7 @@
 按 DVD-VR 光盘 **IFO 里的节目表**，把 `VR_MOVIE.VRO` 无损拆成一个个 `.mpg`。
 是 [spinningbanana/dvd-rtr-vmg0-splitter](https://github.com/spinningbanana/dvd-rtr-vmg0-splitter) 的重写版。
 
-- 版本：**2.1.5**
+- 版本：**2.2.0**
 - 语言：**中文 / 日本語 / English**（界面右上角切换，选择会记住）
 - 许可：GPL-3.0（沿用原项目）
 - 依赖：Python 3.9+；GUI 需 PySide6；`--remux` 需 ffmpeg
@@ -75,6 +75,47 @@ vvob_t（21 字节）: attr(2) 录制时间(5) data1(1) format_id(1) s_ptm(4+2) 
 输出文件按 **IFO 里的录制日期时间**命名：`2026-11-11_17-36-20.mpg`；
 没有录制时间时退回 `program_01.mpg`；同名自动加 `_2`。
 
+### 输出格式（2.2.0 新增 MP4）
+
+界面上「节目列表」右下角有 **输出格式** 下拉框，命令行用 `--format`：
+
+| 格式 | 说明 | 用途 |
+|---|---|---|
+| `mpg` | **无损直拷**，最快（68 MB 约 0.1 秒） | 存档、后期剪辑 |
+| `remux` | 用 ffmpeg 重封装成规整 MPG（不重编码） | 某些播放器/软件不认原始 VOB 时间戳时 |
+| `mp4` | **H.264 + AAC，自动去横纹**，质量优先 | 手机/电视/微信直接播放 |
+
+MP4 的默认参数（质量优先）：
+
+- 视频：`libx264 -crf 16 -preset slow -pix_fmt yuv420p -profile high`
+- 去横纹：检测到隔行（本机素材是 `tt`，顶场优先）自动用 **`bwdif=mode=send_frame:parity=tff`**；
+  可用 `--deint frame|field|off` 控制（`field` 输出 59.94p 更顺滑，`off` 不处理）
+- 音频：AC-3 → AAC 192 kbps 立体声
+- 容器：MP4 + `+faststart`（网页/手机秒开），并标记 BT.601 色彩
+- 中间文件写在系统临时目录，转码完成/失败都会删除，输出目录里只会留下 `.mp4`
+
+```bat
+:: 无损 MPG（默认）
+python dvdvr_split.py --ifo ... --vro ... -o D:\out
+
+:: 直接转 MP4（画质优先，自动去横纹）
+python dvdvr_split.py --ifo ... --vro ... -o D:\out --format mp4
+
+:: 更高画质 / 更慢编码，或 59.94p 双倍帧率
+python dvdvr_split.py --ifo ... --vro ... -o D:\out --format mp4 --crf 12 --preset veryslow
+python dvdvr_split.py --ifo ... --vro ... -o D:\out --format mp4 --deint field
+```
+
+#### 去横纹效果（同一帧对比，实测素材）
+
+| 原始 MPG（隔行源，有横纹） | MP4 输出（bwdif 反交错） |
+|---|---|
+| <img src="screenshots/v2.2.0/mp4-before.png" width="420"> | <img src="screenshots/v2.2.0/mp4-after.png" width="420"> |
+
+界面里的「输出格式」下拉框：
+
+<img src="screenshots/v2.2.0/gui-format-zh.png" width="620">
+
 ### 命令行
 
 ```bat
@@ -115,6 +156,14 @@ python dvdvr_split.py --ifo ... --vro ... -o D:\out --programs 2 --remux --lang 
   仍失败时报出**具体偏移**和**已写入字节数**。
 - 新增 **「读取错误时跳过」** 选项（命令行 `--skip-errors`）：光盘有划痕时可跳过坏块继续导出，
   跳过的位置会写进日志。
+
+### 2.2.0 新增（2026-11-23）
+
+- **MP4 输出**（H.264 + AAC），质量优先：CRF 16 / preset slow；
+- **自动去横纹**：检测源是否隔行（`field_order`），隔行时用 `bwdif` 反交错，
+  实测同一帧对比：原始 MPG 有明显的横向拉丝，MP4 干净无横纹；
+- 中间文件放系统临时目录，成功/失败都自动清理，输出目录只留最终文件；
+- 命令行新增 `--format mpg|remux|mp4`、`--crf`、`--preset`、`--deint`。
 
 ### 2.1.5 修复（2026-11-14）
 

@@ -38,7 +38,7 @@ DVD-VR Splitter 2  —  按 IFO 节目表无损导出 DVD-VR (.VRO) 录像
 ----
   GUI:   python dvdvr_split.py
   CLI:   python dvdvr_split.py --ifo ... --vro ... --list
-         python dvdvr_split.py --ifo ... --vro ... -o D:\\out [--programs 1,2] [--remux]
+         python dvdvr_split.py --ifo ... --vro ... -o D:\\out [--programs 1,2] [--format mp4]
          python dvdvr_split.py --lang ja
 
 许可：GPL-3.0（沿用原项目）
@@ -58,7 +58,7 @@ from typing import Callable, List, Optional
 
 SECTOR = 2048
 APP_NAME = "DVD-VR Splitter"
-APP_VERSION = "2.1.5"
+APP_VERSION = "2.2.0"
 
 # Windows 控制台默认 GBK；被重定向（管道/文件）时改用 UTF-8，避免乱码
 if sys.platform == "win32":
@@ -162,6 +162,14 @@ STR = {
         "col.offset": "VRO 偏移",
         "btn.all": "全选",
         "btn.none": "全不选",
+        "fmt.name": "输出格式",
+        "fmt.mpg": "MPG（无损直拷，最快）",
+        "fmt.remux": "MPG（ffmpeg 重封装）",
+        "fmt.mp4": "MP4（H.264，去横纹）",
+        "log.transcoding": "    转码 MP4（libx264 CRF {crf}，{deint}）…",
+        "log.deint_none": "源为逐行，无需去横纹",
+        "log.deint_bwdif": "隔行源（{order}），bwdif 去横纹（{mode}）",
+        "err.mp4_failed": "MP4 转码失败：\n{e}",
         "chk.remux": "用 ffmpeg 重封装成规整 MPG（慢，但兼容性更好）",
         "group.export": "3. 导出",
         "btn.browse": "浏览…",
@@ -262,6 +270,14 @@ STR = {
         "col.offset": "VRO オフセット",
         "btn.all": "すべて選択",
         "btn.none": "選択解除",
+        "fmt.name": "出力形式",
+        "fmt.mpg": "MPG（無劣化コピー・最速）",
+        "fmt.remux": "MPG（ffmpeg 再マックス）",
+        "fmt.mp4": "MP4（H.264・横縞除去）",
+        "log.transcoding": "    MP4 に変換中（libx264 CRF {crf}、{deint}）…",
+        "log.deint_none": "プログレッシブのため横縞処理は不要",
+        "log.deint_bwdif": "インターレース（{order}）→ bwdif で横縞除去（{mode}）",
+        "err.mp4_failed": "MP4 への変換に失敗しました:\n{e}",
         "chk.remux": "ffmpeg で再マックスして整った MPG にする（遅いが互換性が高い）",
         "group.export": "3. 書き出し",
         "btn.browse": "参照…",
@@ -362,6 +378,14 @@ STR = {
         "col.offset": "VRO offset",
         "btn.all": "Select all",
         "btn.none": "Select none",
+        "fmt.name": "Format",
+        "fmt.mpg": "MPG (lossless copy, fastest)",
+        "fmt.remux": "MPG (ffmpeg remux)",
+        "fmt.mp4": "MP4 (H.264, deinterlaced)",
+        "log.transcoding": "    transcoding MP4 (libx264 CRF {crf}, {deint})…",
+        "log.deint_none": "progressive source, no deinterlacing needed",
+        "log.deint_bwdif": "interlaced ({order}) → bwdif deinterlacing ({mode})",
+        "err.mp4_failed": "MP4 transcode failed:\n{e}",
         "chk.remux": "Remux to clean MPG with ffmpeg (slower, better compatibility)",
         "group.export": "3. Export",
         "btn.browse": "Browse…",
@@ -843,17 +867,25 @@ def extract_program(vro_path: str, prog: Program, out_path: str,
     return done
 
 
-def unique_name(folder: str, base: str) -> str:
+def unique_name(folder: str, base: str, ext: str = ".mpg") -> str:
     """同名时追加 _2、_3…（IFO 里两个节目可能同一分钟录制）"""
-    name = base + ".mpg"
+    name = base + ext
     if not os.path.exists(os.path.join(folder, name)):
         return name
     i = 2
     while True:
-        name = "%s_%d.mpg" % (base, i)
+        name = "%s_%d%s" % (base, i, ext)
         if not os.path.exists(os.path.join(folder, name)):
             return name
         i += 1
+
+
+def temp_vob() -> str:
+    """给“先无损拷贝、再转码”用的临时文件（系统临时目录，不落在输出目录）"""
+    import tempfile
+    fd, path = tempfile.mkstemp(prefix="dvdvr_", suffix=".vob")
+    os.close(fd)
+    return path
 
 
 def remux_with_ffmpeg(raw_path: str, final_path: str, ffmpeg: str) -> None:
@@ -863,6 +895,86 @@ def remux_with_ffmpeg(raw_path: str, final_path: str, ffmpeg: str) -> None:
     p = subprocess.run(cmd, capture_output=True)
     if p.returncode != 0:
         raise DVDVRError(t("err.remux_failed", e=p.stderr.decode("utf-8", "replace")[:2000]))
+
+
+def which_ffprobe() -> Optional[str]:
+    import shutil
+    p = shutil.which("ffprobe")
+    if p:
+        return p
+    ff = which_ffmpeg()
+    if ff:
+        cand = os.path.join(os.path.dirname(ff), "ffprobe.exe")
+        if os.path.isfile(cand):
+            return cand
+    for cand in (r"E:\DVD\ffmpeg\bin\ffprobe.exe", os.path.join(".", "ffmpeg", "bin", "ffprobe.exe")):
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
+def probe_field_order(path: str, ffprobe: Optional[str]) -> str:
+    """返回 tt / bb / progressive / unknown"""
+    if not ffprobe:
+        return "unknown"
+    import subprocess
+    try:
+        p = subprocess.run([ffprobe, "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=field_order",
+                            "-of", "default=nw=1:nk=1", path],
+                           capture_output=True, timeout=60)
+        if p.returncode == 0:
+            txt = p.stdout.decode("utf-8", "replace").strip().splitlines()
+            if txt:
+                return txt[0].strip().lower()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def transcode_mp4(raw_path: str, final_path: str, ffmpeg: str, ffprobe: Optional[str] = None,
+                  crf: int = 16, preset: str = "slow", deint: str = "auto") -> str:
+    """把无损拷贝出来的 VOB 转成 MP4（H.264 + AAC），默认按需去横纹。
+
+    质量优先：CRF 16 / preset slow / yuv420p / BT.601 标记 / faststart。
+    deint: auto（检测隔行→bwdif send_frame）| frame | field | off
+    """
+    import subprocess
+    order = probe_field_order(raw_path, ffprobe) if deint != "off" else "unknown"
+    interlaced = False
+    if deint != "off":
+        if order in ("tt", "tff", "bb", "bff"):
+            interlaced = True
+        elif order == "unknown":
+            interlaced = True          # DVD 摄像机基本都是隔行，未知时按隔行处理更安全
+    note = t("log.deint_none")
+    vf = None
+    if interlaced:
+        mode = "send_field" if deint == "field" else "send_frame"
+        parity = {"tt": "tff", "tff": "tff", "bb": "bff", "bff": "bff"}.get(order, "auto")
+        vf = "bwdif=mode=%s:parity=%s:deint=all" % (mode, parity)
+        note = t("log.deint_bwdif", order=order, mode=mode)
+
+    base = [ffmpeg, "-hide_banner", "-v", "error", "-y", "-fflags", "+genpts", "-i", raw_path]
+    if vf:
+        base += ["-vf", vf]
+    base += ["-map", "0:v:0", "-map", "0:a:0?",
+             "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+             "-pix_fmt", "yuv420p", "-profile:v", "high", "-level", "4.0",
+             "-color_primaries", "smpte170m", "-color_trc", "smpte170m",
+             "-colorspace", "smpte170m",
+             "-c:a", "aac", "-b:a", "192k"]
+    tail = ["-movflags", "+faststart", "-f", "mp4", final_path]
+    last = b""
+    for fps_opt in (["-fps_mode", "cfr"], ["-vsync", "cfr"]):
+        cmd = base + fps_opt + tail
+        p = subprocess.run(cmd, capture_output=True)
+        if p.returncode == 0:
+            return note
+        last = p.stderr
+        if b"Unrecognized option" not in last and b"fps_mode" not in last:
+            break
+    raise DVDVRError(t("err.mp4_failed", e=last.decode("utf-8", "replace")[:2000]))
 
 
 def which_ffmpeg() -> Optional[str]:
@@ -987,26 +1099,39 @@ def cmd_extract(args) -> int:
         for x in [q for q in todo if q.index not in allowed]:
             print(t("log.skip_out", i=x.index))
         todo = [q for q in todo if q.index in allowed]
-    ffmpeg = which_ffmpeg() if args.remux else None
-    if args.remux and not ffmpeg:
+    fmt = "remux" if args.remux else args.format
+    needs_ff = fmt in ("remux", "mp4")
+    ffmpeg = which_ffmpeg() if needs_ff else None
+    if needs_ff and not ffmpeg:
         raise DVDVRError(t("err.ffmpeg_needed"))
+    ffprobe = which_ffprobe() if fmt == "mp4" else None
 
     print(t("cli.export_start", n=len(todo), dir=args.out))
     for p in todo:
-        name = unique_name(args.out, safe_name(p.file_base()))
+        ext = ".mp4" if fmt == "mp4" else ".mpg"
+        name = unique_name(args.out, safe_name(p.file_base()), ext)
         final = os.path.join(args.out, name)
-        raw = final + ".vob" if args.remux else final
+        raw = temp_vob() if fmt != "mpg" else final
         t0 = time.time()
         limit = p.byte_size if p.end_byte <= info.vsize else max(0, info.vsize - p.start_byte)
         if limit <= 0:
             print(t("log.skip_out", i=p.index))
             continue
-        n = extract_program(args.vro, p, raw, skip_errors=args.skip_errors,
-                            on_skip=lambda off, nb: print(t("log.skip_block", off=off, n=nb)),
-                            max_bytes=limit)
-        if args.remux:
-            remux_with_ffmpeg(raw, final, ffmpeg)
-            os.remove(raw)
+        try:
+            n = extract_program(args.vro, p, raw, skip_errors=args.skip_errors,
+                                on_skip=lambda off, nb: print(t("log.skip_block", off=off, n=nb)),
+                                max_bytes=limit)
+            if fmt == "remux":
+                remux_with_ffmpeg(raw, final, ffmpeg)
+            elif fmt == "mp4":
+                note = transcode_mp4(raw, final, ffmpeg, ffprobe, args.crf, args.preset, args.deint)
+                print("    " + note)
+        finally:
+            if fmt != "mpg":
+                try:
+                    os.remove(raw)
+                except OSError:
+                    pass
         dt = time.time() - t0
         ok = t("cli.ok") if n == p.byte_size else t("cli.mismatch", got=n, want=p.byte_size)
         print(t("cli.line", i=p.index, name=name, size=fmt_bytes(n), ok=ok, sec=dt))
@@ -1023,7 +1148,13 @@ def build_cli() -> argparse.ArgumentParser:
     ap.add_argument("-o", "--out", help="output folder")
     ap.add_argument("--programs", help="program numbers to export, e.g. 1,3 (default: all)")
     ap.add_argument("--list", action="store_true", help="list programs only")
-    ap.add_argument("--remux", action="store_true", help="remux to clean MPG with ffmpeg")
+    ap.add_argument("--format", choices=("mpg", "remux", "mp4"), default="mpg",
+                    help="output format: mpg (lossless copy) / remux (clean MPG) / mp4 (H.264, deinterlaced)")
+    ap.add_argument("--remux", action="store_true", help="alias for --format remux")
+    ap.add_argument("--crf", type=int, default=16, help="x264 quality (lower = better, default 16)")
+    ap.add_argument("--preset", default="slow", help="x264 preset (default slow)")
+    ap.add_argument("--deint", choices=("auto", "frame", "field", "off"), default="auto",
+                    help="deinterlace mode: auto (default) / frame / field (double fps) / off")
     ap.add_argument("--force", action="store_true",
                     help="also export entries whose data is not in the VRO (garbage)")
     ap.add_argument("--skip-errors", action="store_true",
@@ -1081,10 +1212,14 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
         log = Signal(str)
         done = Signal(bool, str)
 
-        def __init__(self, info: DiscInfo, outdir: str, progs: List[Program], remux: bool,
-                     skip_errors: bool = False):
+        def __init__(self, info: DiscInfo, outdir: str, progs: List[Program], fmt: str = "mpg",
+                     skip_errors: bool = False, crf: int = 16, preset: str = "slow",
+                     deint: str = "auto"):
             super().__init__()
-            self.info, self.outdir, self.progs, self.remux = info, outdir, progs, remux
+            self.info, self.outdir, self.progs = info, outdir, progs
+            self.fmt = fmt
+            self.remux = fmt == "remux"
+            self.crf, self.preset, self.deint = crf, preset, deint
             self.skip_errors = skip_errors
             self._cancel = False
             self.result = []
@@ -1097,15 +1232,18 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
                 ensure_output_dir(self.outdir)
                 total_all = sum(p.byte_size for p in self.progs) or 1
                 base_done = 0
-                ffmpeg = which_ffmpeg() if self.remux else None
-                if self.remux and not ffmpeg:
+                needs_ff = self.fmt in ("remux", "mp4")
+                ffmpeg = which_ffmpeg() if needs_ff else None
+                ffprobe = which_ffprobe() if self.fmt == "mp4" else None
+                if needs_ff and not ffmpeg:
                     raise DVDVRError(t("err.ffmpeg_needed"))
                 for p in self.progs:
                     if self._cancel:
                         raise Cancelled()
-                    name = unique_name(self.outdir, safe_name(p.file_base()))
+                    ext = ".mp4" if self.fmt == "mp4" else ".mpg"
+                    name = unique_name(self.outdir, safe_name(p.file_base()), ext)
                     final = os.path.join(self.outdir, name)
-                    raw = final + ".vob" if self.remux else final
+                    raw = temp_vob() if self.fmt != "mpg" else final
                     self.log.emit(t("log.program", i=p.index, time=p.time_label(),
                                     dur=fmt_ptm(p.duration), size=fmt_bytes(p.byte_size)))
                     t0 = time.time()
@@ -1120,16 +1258,27 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
                         base_done += p.byte_size
                         self.progress.emit(base_done, total_all)
                         continue
-                    n = extract_program(self.info.vro_path, p, raw,
-                                        progress=cb, cancel=lambda: self._cancel,
-                                        skip_errors=self.skip_errors,
-                                        on_skip=lambda off, nb: self.log.emit(
-                                            t("log.skip_block", off=off, n=nb)),
-                                        max_bytes=limit)
-                    if self.remux:
-                        self.log.emit(t("log.remuxing"))
-                        remux_with_ffmpeg(raw, final, ffmpeg)
-                        os.remove(raw)
+                    try:
+                        n = extract_program(self.info.vro_path, p, raw,
+                                            progress=cb, cancel=lambda: self._cancel,
+                                            skip_errors=self.skip_errors,
+                                            on_skip=lambda off, nb: self.log.emit(
+                                                t("log.skip_block", off=off, n=nb)),
+                                            max_bytes=limit)
+                        if self.fmt == "remux":
+                            self.log.emit(t("log.remuxing"))
+                            remux_with_ffmpeg(raw, final, ffmpeg)
+                        elif self.fmt == "mp4":
+                            self.log.emit(t("log.transcoding", crf=self.crf, deint=self.deint))
+                            note = transcode_mp4(raw, final, ffmpeg, ffprobe,
+                                                 self.crf, self.preset, self.deint)
+                            self.log.emit("    " + note)
+                    finally:
+                        if self.fmt != "mpg":
+                            try:
+                                os.remove(raw)
+                            except OSError:
+                                pass
                     base_done += p.byte_size
                     self.progress.emit(base_done, total_all)
                     if n != p.byte_size:
@@ -1240,13 +1389,15 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
             self.btn_none = QPushButton()
             self.btn_all.clicked.connect(lambda: self.check_all(True))
             self.btn_none.clicked.connect(lambda: self.check_all(False))
-            self.chk_remux = QCheckBox()
+            self.lbl_fmt = QLabel()
+            self.cmb_fmt = QComboBox()
             self.chk_skip = QCheckBox()
             row3.addWidget(self.btn_all)
             row3.addWidget(self.btn_none)
             row3.addStretch(1)
+            row3.addWidget(self.lbl_fmt)
+            row3.addWidget(self.cmb_fmt)
             row3.addWidget(self.chk_skip)
-            row3.addWidget(self.chk_remux)
             v.addLayout(row3)
             lay.addWidget(self.gb_programs, 1)
 
@@ -1304,7 +1455,11 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
                  t("col.duration"), t("col.size"), t("col.offset")])
             self.btn_all.setText(t("btn.all"))
             self.btn_none.setText(t("btn.none"))
-            self.chk_remux.setText(t("chk.remux"))
+            self.lbl_fmt.setText(t("fmt.name"))
+            cur = self.cmb_fmt.currentIndex()
+            self.cmb_fmt.clear()
+            self.cmb_fmt.addItems([t("fmt.mpg"), t("fmt.remux"), t("fmt.mp4")])
+            self.cmb_fmt.setCurrentIndex(cur if cur >= 0 else 0)
             self.chk_skip.setText(t("chk.skip_errors"))
             self.gb_export.setTitle(t("group.export"))
             self.btn_browse.setText(t("btn.browse"))
@@ -1529,8 +1684,8 @@ def run_gui(prefill_ifo: str = "", prefill_vro: str = "", show_about: bool = Fal
             self.pbar.setValue(0)
             self.btn_start.setEnabled(False)
             self.btn_cancel.setEnabled(True)
-            self.worker = Worker(self.info, out, progs, self.chk_remux.isChecked(),
-                                 self.chk_skip.isChecked())
+            fmt = ("mpg", "remux", "mp4")[max(0, self.cmb_fmt.currentIndex())]
+            self.worker = Worker(self.info, out, progs, fmt, self.chk_skip.isChecked())
             self.worker.progress.connect(self.on_progress)
             self.worker.log.connect(self.logln)
             self.worker.done.connect(self.on_done)

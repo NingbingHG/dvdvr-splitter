@@ -3,6 +3,22 @@
 All notable changes to this project.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0] — 2026-11-23
+
+### Added
+- **MP4 output** (H.264 + AAC), quality first: `libx264 -crf 16 -preset slow`,
+  `yuv420p`, BT.601 tags, `+faststart`.
+- **Automatic deinterlacing**: probes `field_order`; interlaced sources
+  (`tt`/`bb`, typical for DVD camcorders) go through
+  `bwdif=mode=send_frame:parity=tff|bff`, progressive sources are left alone.
+  Verified on real footage: the original frame shows combing, the MP4 frame is
+  clean (same frame, 2475 frames both, identical duration).
+- Direct VRO → MP4: the intermediate `.vob` is written to the system temp
+  folder and always removed, so only the final `.mp4` lands in the output dir.
+- CLI: `--format mpg|remux|mp4`, `--crf`, `--preset`, `--deint auto|frame|field|off`
+  (`--remux` kept as an alias for `--format remux`).
+- GUI: an "output format" combo box replaces the old remux checkbox.
+
 ## [2.1.5] — 2026-11-14
 
 ### Fixed
